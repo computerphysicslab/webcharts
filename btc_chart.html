@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Charts – Multi‑Provider (Binance/Bybit/CoinGecko/CoinPaprika)</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0d0d0d;
+            color: #e0e0e0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+        }
+        #chart-container { position: relative; width: 100%; height: 100%; }
+        #chart { width: 100%; height: 100%; }
+        #top-bar {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            z-index: 20;
+            background: rgba(10, 10, 10, 0.85);
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            padding: 5px 12px;
+            backdrop-filter: blur(6px);
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        #asset-bar, #timeframe-bar, #provider-bar {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        #timeframe-bar, #provider-bar {
+            border-left: 1px solid #2a2a2a;
+            padding-left: 10px;
+            margin-left: 5px;
+        }
+        .asset-btn, .tf-btn, .provider-btn {
+            background: transparent;
+            border: 1px solid transparent;
+            color: #888;
+            font-size: 11px;
+            font-family: inherit;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .asset-btn:hover, .tf-btn:hover, .provider-btn:hover {
+            color: #ccc;
+            border-color: #444;
+        }
+        .asset-btn.active, .tf-btn.active, .provider-btn.active {
+            color: #fff;
+            background: #1e1e1e;
+            border-color: #3a3a3a;
+        }
+        #dino {
+            position: absolute;
+            bottom: 20px;
+            left: 10px;
+            font-size: 24px;
+            z-index: 25;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            text-shadow: 0 0 2px black;
+        }
+        #hover-legend {
+            position: absolute;
+            bottom: 12px;
+            left: 14px;
+            background: rgba(15, 15, 15, 0.92);
+            border: 1px solid #2a2a2a;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            line-height: 1.65;
+            pointer-events: none;
+            display: none;
+            z-index: 20;
+            backdrop-filter: blur(4px);
+            font-family: monospace;
+            max-width: 320px;
+        }
+        #header {
+            position: absolute;
+            top: 14px;
+            right: 16px;
+            font-size: 11px;
+            color: #777;
+            z-index: 10;
+            pointer-events: none;
+            background: rgba(10, 10, 10, 0.5);
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        #loading {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1em;
+            color: #666;
+            background: #0d0d0d;
+            z-index: 30;
+            transition: opacity 0.2s;
+        }
+        #loading.hidden { opacity: 0; pointer-events: none; }
+    </style>
+</head>
+<body>
+<div id="chart-container">
+    <div id="loading">Loading…</div>
+    <div id="top-bar">
+        <div id="asset-bar">
+            <button class="asset-btn active" data-asset="BTC">BTC</button>
+            <button class="asset-btn" data-asset="ETH">ETH</button>
+            <button class="asset-btn" data-asset="BNB">BNB</button>
+            <button class="asset-btn" data-asset="SOL">SOL</button>
+            <button class="asset-btn" data-asset="XRP">XRP</button>
+            <button class="asset-btn" data-asset="DOGE">DOGE</button>
+            <button class="asset-btn" data-asset="DOT">DOT</button>
+            <button class="asset-btn" data-asset="KSM">KSM</button>
+            <button class="asset-btn" data-asset="SUI">SUI</button>
+            <button class="asset-btn" data-asset="TRUMP">TRUMP</button>
+            <button class="asset-btn" data-asset="ATOM">ATOM</button>
+        </div>
+        <div id="provider-bar">
+            <button class="provider-btn active" data-provider="binance">Binance</button>
+            <button class="provider-btn" data-provider="bybit">Bybit</button>
+            <button class="provider-btn" data-provider="coingecko">CoinGecko</button>
+            <button class="provider-btn" data-provider="coinpaprika">CoinPaprika</button>
+        </div>
+        <div id="timeframe-bar"></div>
+    </div>
+    <div id="chart"></div>
+    <div id="dino">🦕</div>
+    <div id="hover-legend"></div>
+    <div id="header">1d · Log Price · EMA200 + SuperVolume Dots</div>
+</div>
+
+<script>
+    // ---------- ASSET MAPPINGS ----------
+    const ASSETS = {
+        BTC:   { label: 'BTC/USD', binance: 'BTCUSDT', bybit: 'BTCUSDT', gecko: 'bitcoin', paprika: 'btc-bitcoin' },
+        ETH:   { label: 'ETH/USD', binance: 'ETHUSDT', bybit: 'ETHUSDT', gecko: 'ethereum', paprika: 'eth-ethereum' },
+        BNB:   { label: 'BNB/USD', binance: 'BNBUSDT', bybit: 'BNBUSDT', gecko: 'binancecoin', paprika: 'bnb-binance-coin' },
+        SOL:   { label: 'SOL/USD', binance: 'SOLUSDT', bybit: 'SOLUSDT', gecko: 'solana', paprika: 'sol-solana' },
+        XRP:   { label: 'XRP/USD', binance: 'XRPUSDT', bybit: 'XRPUSDT', gecko: 'ripple', paprika: 'xrp-xrp' },
+        DOGE:  { label: 'DOGE/USD',binance: 'DOGEUSDT',bybit: 'DOGEUSDT', gecko: 'dogecoin', paprika: 'doge-dogecoin' },
+        DOT:   { label: 'DOT/USD', binance: 'DOTUSDT', bybit: 'DOTUSDT', gecko: 'polkadot', paprika: 'dot-polkadot' },
+        KSM:   { label: 'KSM/USD', binance: 'KSMUSDT', bybit: 'KSMUSDT', gecko: 'kusama', paprika: 'ksm-kusama' },
+        SUI:   { label: 'SUI/USD', binance: 'SUIUSDT', bybit: 'SUIUSDT', gecko: 'sui', paprika: 'sui-sui' },
+        TRUMP: { label: 'TRUMP/USD',binance: 'TRUMPUSDT',bybit: 'TRUMPUSDT', gecko: 'trump', paprika: 'trump-trump' },
+        ATOM:  { label: 'ATOM/USD',binance: 'ATOMUSDT',bybit: 'ATOMUSDT', gecko: 'cosmos', paprika: 'atom-cosmos' },
+    };
+
+    // Provider configurations
+    const PROVIDERS = {
+        binance: {
+            name: 'Binance',
+            supportedTimeframes: ['1M','1w','3d','1d','12h','6h','2h','1h','15m','3m','1m'],
+            mapSymbol: (asset) => ASSETS[asset].binance,
+            fetch: fetchBinance,
+            supportsInfinite: true
+        },
+        bybit: {
+            name: 'Bybit',
+            supportedTimeframes: ['1M','1w','3d','1d','12h','6h','2h','1h','15m','3m','1m'],
+            mapSymbol: (asset) => ASSETS[asset].bybit,
+            fetch: fetchBybit,
+            supportsInfinite: true
+        },
+        coingecko: {
+            name: 'CoinGecko',
+            supportedTimeframes: ['1d','1w','1M'],
+            mapSymbol: (asset) => ASSETS[asset].gecko,
+            fetch: fetchCoinGecko,
+            supportsInfinite: false   // no pagination, initial load only
+        },
+        coinpaprika: {
+            name: 'CoinPaprika',
+            supportedTimeframes: ['1M','1w','1d','1h','5m'],
+            mapSymbol: (asset) => ASSETS[asset].paprika,
+            fetch: fetchCoinPaprika,
+            supportsInfinite: true
+        }
+    };
+
+    // Timeframe -> interval mapping
+    const timeframeToInterval = {
+        binance: {
+            '1M':'1M','1w':'1w','3d':'3d','1d':'1d','12h':'12h','6h':'6h','2h':'2h','1h':'1h','15m':'15m','3m':'3m','1m':'1m'
+        },
+        bybit: {
+            '1M':'M','1w':'W','3d':'3D','1d':'D','12h':'12h','6h':'6h','2h':'2h','1h':'1h','15m':'15','3m':'3','1m':'1'
+        },
+        coingecko: {
+            '1d':1, '1w':7, '1M':30
+        },
+        coinpaprika: {
+            '1M': { interval: '1d', limit: 30 },
+            '1w': { interval: '1d', limit: 7 },
+            '1d': { interval: '1d', limit: 30 },
+            '1h': { interval: '1h', limit: 500 },
+            '5m': { interval: '5m', limit: 500 }
+        }
+    };
+
+    // ---------- DATA FETCHERS ----------
+    async function fetchBinance(symbol, interval, limit = 500, endTimeMs = null) {
+        let url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+        if (endTimeMs) url += `&endTime=${endTimeMs}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Binance HTTP ${res.status}`);
+        const data = await res.json();
+        return data.map(d => ({
+            time:   Math.floor(d[0] / 1000),
+            open:   parseFloat(d[1]),
+            high:   parseFloat(d[2]),
+            low:    parseFloat(d[3]),
+            close:  parseFloat(d[4]),
+            volume: parseFloat(d[5])
+        }));
+    }
+
+    async function fetchBybit(symbol, interval, limit = 500, endTimeMs = null) {
+        let url = `https://api.bybit.com/v5/market/kline?category=spot&symbol=${symbol}&interval=${interval}&limit=${limit}`;
+        if (endTimeMs) url += `&end=${endTimeMs}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Bybit HTTP ${res.status}`);
+        const json = await res.json();
+        if (json.retCode !== 0) throw new Error(`Bybit API error: ${json.retMsg}`);
+        const candles = json.result.list;
+        return candles.map(c => ({
+            time:   Math.floor(parseInt(c[0]) / 1000),
+            open:   parseFloat(c[1]),
+            high:   parseFloat(c[2]),
+            low:    parseFloat(c[3]),
+            close:  parseFloat(c[4]),
+            volume: parseFloat(c[5])
+        })).reverse();
+    }
+
+    async function fetchCoinGecko(symbol, days, limit = 500, endTimeMs = null) {
+        // CoinGecko doesn't support endTime pagination; just fetch the required days
+        const url = `https://api.coingecko.com/api/v3/coins/${symbol}/ohlc?vs_currency=usd&days=${days}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`CoinGecko HTTP ${res.status}`);
+        const data = await res.json();
+        // data is array of [time, open, high, low, close] in ms
+        return data.map(d => ({
+            time:   Math.floor(d[0] / 1000),
+            open:   d[1],
+            high:   d[2],
+            low:    d[3],
+            close:  d[4],
+            volume: 0   // CoinGecko OHLC doesn't provide volume
+        }));
+    }
+
+    async function fetchCoinPaprika(symbol, tfConfig, limit = 500, endTimeMs = null) {
+        const interval = tfConfig.interval;
+        let start = null, end = null;
+        if (endTimeMs) {
+            // calculate start timestamp for older data
+            const msPerCandle = { '5m': 5*60*1000, '1h': 60*60*1000, '1d': 24*60*60*1000 }[interval];
+            if (msPerCandle) {
+                end = endTimeMs;
+                start = end - limit * msPerCandle;
+            }
+        }
+        let url = `https://api.coinpaprika.com/v1/coins/${symbol}/ohlcv?quote=usd&limit=${limit}&interval=${interval}`;
+        if (start) url += `&start=${Math.floor(start/1000)}`;
+        if (end) url += `&end=${Math.floor(end/1000)}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`CoinPaprika HTTP ${res.status}`);
+        const data = await res.json();
+        return data.map(d => ({
+            time:   Math.floor(new Date(d.time_open).getTime() / 1000),
+            open:   d.open,
+            high:   d.high,
+            low:    d.low,
+            close:  d.close,
+            volume: d.volume
+        })).sort((a,b) => a.time - b.time);
+    }
+
+    // ---------- GLOBAL STATE ----------
+    let chart = null;
+    let currentAsset = 'BTC';
+    let currentProvider = 'binance';
+    let currentTimeframe = '1d';
+    let allData = [];
+    let isLoading = false;
+    let hasMore = true;
+    let oldestTimeMs = null;
+
+    const loadingDiv = document.getElementById('loading');
+    const hoverDiv = document.getElementById('hover-legend');
+    const headerDiv = document.getElementById('header');
+    const dinoDiv = document.getElementById('dino');
+    const timeframeBar = document.getElementById('timeframe-bar');
+
+    // ---------- HELPERS ----------
+    function formatVolume(v) {
+        if (v >= 1e9) return (v / 1e9).toFixed(2) + 'B';
+        if (v >= 1e6) return (v / 1e6).toFixed(2) + 'M';
+        if (v >= 1e3) return (v / 1e3).toFixed(2) + 'K';
+        return v.toFixed(0);
+    }
+    function formatValue(v) {
+        if (v >= 1e9) return (v / 1e9).toFixed(2) + 'B';
+        if (v >= 1e6) return (v / 1e6).toFixed(2) + 'M';
+        if (v >= 1e3) return (v / 1e3).toFixed(2) + 'K';
+        if (v < 0.01) return v.toExponential(2);
+        return v.toFixed(2);
+    }
+    function formatTime(ts, timeframe) {
+        const d = new Date(ts * 1000);
+        if (timeframe.includes('m') || timeframe.includes('h')) {
+            return d.toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+        }
+        return d.toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' });
+    }
+
+    function computeIndicator(d) {
+        const denom = d.high - 0.99 * d.low;
+        if (denom <= 1e-8) return 0;
+        let val = (d.volume * d.close) / denom;
+        const MAX = 1e9;
+        if (val > MAX) val = MAX;
+        return Math.max(val, 1e-6);
+    }
+
+    function computeEMA(data, period) {
+        if (data.length < period) return [];
+        const k = 2 / (period + 1);
+        let ema = data.slice(0, period).reduce((s, d) => s + d.close, 0) / period;
+        const result = [{ time: data[period - 1].time, value: ema }];
+        for (let i = period; i < data.length; i++) {
+            ema = (data[i].close - ema) * k + ema;
+            result.push({ time: data[i].time, value: ema });
+        }
+        return result;
+    }
+
+    function renderChart() {
+        if (!chart || !allData.length) return;
+
+        const candleData = allData.map(d => [d.time * 1000, d.open, d.close, d.low, d.high]);
+        const emaPoints = computeEMA(allData, 200);
+        const emaLine = emaPoints.map(p => [p.time * 1000, p.value]);
+        const indicatorDots = allData.map(d => [d.time * 1000, computeIndicator(d)]);
+
+        const option = {
+            backgroundColor: '#0d0d0d',
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: { type: 'cross' },
+                backgroundColor: 'rgba(20,20,20,0.95)',
+                borderColor: '#3a3a3a',
+                borderWidth: 1,
+                textStyle: { color: '#e0e0e0', fontSize: 11 },
+                formatter: function(params) {
+                    if (!params.length) return '';
+                    const timestamp = params[0].value[0];
+                    const d = allData.find(d => d.time * 1000 === timestamp);
+                    if (!d) return '';
+                    const isBull = d.close >= d.open;
+                    const dirColor = isBull ? '#26a69a' : '#ef5350';
+                    const indicatorVal = computeIndicator(d);
+                    const fmtInd = formatValue(indicatorVal);
+                    const dateStr = formatTime(d.time, currentTimeframe);
+                    const emaPoint = emaPoints.find(e => e.time === d.time);
+                    const emaVal = emaPoint ? emaPoint.value.toFixed(2) : '—';
+                    return `
+                        <div style="font-weight:bold;">${dateStr}</div>
+                        O ${d.open.toFixed(2)} &nbsp; H <span style="color:#26a69a">${d.high.toFixed(2)}</span><br>
+                        L <span style="color:#ef5350">${d.low.toFixed(2)}</span> &nbsp; C <span style="color:${dirColor}">${d.close.toFixed(2)}</span><br>
+                        EMA200 <span style="color:#ba68c8">${emaVal}</span><br>
+                        Vol: ${formatVolume(d.volume)}<br>
+                        <span style="color:#66ccff">SuperVolume: ${fmtInd}</span>
+                    `;
+                }
+            },
+            legend: {
+                data: ['Candlestick', 'EMA 200', 'Indicator ● (SuperVolume)'],
+                textStyle: { color: '#9a9a9a', fontSize: 10 },
+                backgroundColor: 'transparent',
+                right: 20,
+                top: 50,
+                itemWidth: 20,
+                itemHeight: 12
+            },
+            grid: [
+                { left: '8%', right: '6%', top: '15%', height: '60%', containLabel: false },
+                { left: '8%', right: '6%', top: '78%', height: '12%', containLabel: false }
+            ],
+            xAxis: [
+                { type: 'time', gridIndex: 0, axisLabel: { color: '#7a7a7a', fontSize: 9 }, axisLine: { lineStyle: { color: '#2a2a2a' } } },
+                { type: 'time', gridIndex: 1, axisLabel: { color: '#7a7a7a', fontSize: 9 }, axisLine: { lineStyle: { color: '#2a2a2a' } } }
+            ],
+            yAxis: [
+                { type: 'log', gridIndex: 0, name: 'Price (log)', splitLine: { lineStyle: { color: '#1e1e1e' } }, min: 'dataMin', max: 'dataMax', boundaryGap: [0, 0] },
+                { type: 'log', gridIndex: 1, name: 'Indicator (log)', splitLine: { show: false }, min: 'dataMin', max: 'dataMax', boundaryGap: [0, 0] }
+            ],
+            series: [
+                { name: 'Candlestick', type: 'candlestick', data: candleData, xAxisIndex: 0, yAxisIndex: 0,
+                  itemStyle: { color: '#26a69a', borderColor: '#26a69a', borderColor0: '#ef5350', color0: '#ef5350', borderWidth: 1 } },
+                { name: 'EMA 200', type: 'line', data: emaLine, xAxisIndex: 0, yAxisIndex: 0, lineStyle: { color: '#ba68c8', width: 2 }, smooth: false, symbol: 'none' },
+                { name: 'Indicator ● (SuperVolume)', type: 'scatter', data: indicatorDots, xAxisIndex: 1, yAxisIndex: 1,
+                  symbol: 'circle', symbolSize: 2, itemStyle: { color: '#66ccff', opacity: 0.7 }, tooltip: { show: false }, emphasis: { scale: false } }
+            ],
+            dataZoom: [
+                { type: 'inside', xAxisIndex: [0, 1], start: 0, end: 100, zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: true },
+                { type: 'slider', xAxisIndex: [0, 1], start: 0, end: 100, bottom: 5, height: 16, handleSize: 0, brushSelect: true, backgroundColor: '#1a1a1a', fillerColor: '#2a2a2a' }
+            ]
+        };
+        chart.setOption(option, true);
+        updateDinoVisibility();
+    }
+
+    // Dinosaur visibility: show if no more data and visible left edge includes the oldest data
+    function updateDinoVisibility() {
+        if (!chart || !allData.length) return;
+        const xAxis = chart.getModel().getComponent('xAxis', 0);
+        const extent = xAxis.axis.scale.getExtent();
+        const minTime = extent[0];
+        const oldest = allData[0].time * 1000;
+        const visibleAtEdge = minTime <= oldest + 5000; // close to the oldest
+        const showDino = !hasMore && visibleAtEdge;
+        dinoDiv.style.opacity = showDino ? '0.7' : '0';
+    }
+
+    // ---------- DATA LOADING ----------
+    async function fetchData(provider, asset, timeframe, endTimeMs = null) {
+        const cfg = PROVIDERS[provider];
+        const symbol = cfg.mapSymbol(asset);
+        if (!symbol) throw new Error(`Symbol not available for ${provider}`);
+        const intervalCfg = timeframeToInterval[provider][timeframe];
+        if (!intervalCfg) throw new Error(`Timeframe ${timeframe} not supported by ${provider}`);
+
+        if (provider === 'coingecko') {
+            return await cfg.fetch(symbol, intervalCfg, 500, endTimeMs);
+        } else if (provider === 'coinpaprika') {
+            return await cfg.fetch(symbol, intervalCfg, 500, endTimeMs);
+        } else {
+            // binance, bybit: interval is string
+            return await cfg.fetch(symbol, intervalCfg, 500, endTimeMs);
+        }
+    }
+
+    async function loadMoreData() {
+        if (isLoading || !hasMore || !oldestTimeMs) return;
+        const providerCfg = PROVIDERS[currentProvider];
+        if (!providerCfg.supportsInfinite) {
+            hasMore = false;
+            return;
+        }
+        isLoading = true;
+        try {
+            const older = await fetchData(currentProvider, currentAsset, currentTimeframe, oldestTimeMs - 1);
+            if (!older.length || older.length < 2) { hasMore = false; return; }
+            if (older[0].time >= allData[0].time) { hasMore = false; return; }
+
+            const visibleRange = chart.getModel().getComponent('xAxis', 0).axis.scale.getExtent();
+            const oldMin = visibleRange[0];
+            const oldMax = visibleRange[1];
+            const oldSpan = oldMax - oldMin;
+
+            allData = [...older, ...allData];
+            oldestTimeMs = older[0].time * 1000;
+            renderChart();
+
+            // restore view
+            const dataMin = allData[0].time * 1000;
+            const dataMax = allData[allData.length-1].time * 1000;
+            const finalMin = Math.max(oldMin, dataMin);
+            const finalMax = Math.min(oldMin + oldSpan, dataMax);
+            const startPct = ((finalMin - dataMin) / (dataMax - dataMin)) * 100;
+            const endPct = ((finalMax - dataMin) / (dataMax - dataMin)) * 100;
+            if (isFinite(startPct) && isFinite(endPct)) {
+                chart.dispatchAction({ type: 'dataZoom', start: startPct, end: endPct });
+            }
+        } catch(e) {
+            console.error(e);
+            hasMore = false;
+        } finally {
+            isLoading = false;
+            updateDinoVisibility();
+        }
+    }
+
+    function shouldLoadMore() {
+        if (!hasMore || isLoading) return false;
+        if (!PROVIDERS[currentProvider].supportsInfinite) return false;
+        const xAxis = chart.getModel().getComponent('xAxis', 0);
+        const extent = xAxis.axis.scale.getExtent();
+        const minTime = extent[0];
+        if (!oldestTimeMs) return false;
+        const candleSec = getCandleSeconds(currentTimeframe);
+        if (!candleSec) return false;
+        const threshold = candleSec * 1000 * 2;
+        return minTime <= oldestTimeMs + threshold;
+    }
+
+    function getCandleSeconds(tf) {
+        const map = { '1M':30*86400, '1w':7*86400, '3d':3*86400, '1d':86400, '12h':43200, '6h':21600, '4h':14400, '2h':7200, '1h':3600, '15m':900, '5m':300, '3m':180, '1m':60 };
+        return map[tf] || 86400;
+    }
+
+    async function fetchAndRender() {
+        allData = [];
+        hasMore = true;
+        oldestTimeMs = null;
+        loadingDiv.classList.remove('hidden');
+        hoverDiv.style.display = 'none';
+        dinoDiv.style.opacity = '0';
+        try {
+            allData = await fetchData(currentProvider, currentAsset, currentTimeframe);
+            if (!allData.length) throw new Error('No data');
+            oldestTimeMs = allData[0].time * 1000;
+            renderChart();
+            const provName = PROVIDERS[currentProvider].name;
+            headerDiv.innerHTML = `${ASSETS[currentAsset].label} · ${currentTimeframe} · ${provName} · Log Price · Drag to pan (auto‑load)`;
+        } catch(err) {
+            console.error(err);
+            loadingDiv.innerHTML = `Error: ${err.message}`;
+            setTimeout(() => loadingDiv.classList.add('hidden'), 2000);
+            return;
+        }
+        loadingDiv.classList.add('hidden');
+        updateDinoVisibility();
+    }
+
+    // ---------- UI UPDATE ----------
+    function updateTimeframeButtons() {
+        const supported = PROVIDERS[currentProvider].supportedTimeframes;
+        if (!supported.includes(currentTimeframe)) {
+            currentTimeframe = supported[0] || '1d';
+        }
+        timeframeBar.innerHTML = '';
+        for (const tf of supported) {
+            const btn = document.createElement('button');
+            btn.className = `tf-btn ${tf === currentTimeframe ? 'active' : ''}`;
+            btn.textContent = tf;
+            btn.dataset.tf = tf;
+            btn.addEventListener('click', () => {
+                if (tf === currentTimeframe) return;
+                document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentTimeframe = tf;
+                fetchAndRender();
+            });
+            timeframeBar.appendChild(btn);
+        }
+    }
+
+    function switchProvider(provider) {
+        if (provider === currentProvider) return;
+        currentProvider = provider;
+        updateTimeframeButtons();
+        fetchAndRender();
+    }
+
+    function switchAsset(asset) {
+        if (asset === currentAsset) return;
+        currentAsset = asset;
+        fetchAndRender();
+    }
+
+    function initChart() {
+        const dom = document.getElementById('chart');
+        chart = echarts.init(dom);
+        window.addEventListener('resize', () => chart.resize());
+        chart.on('datazoom', () => {
+            if (shouldLoadMore()) loadMoreData();
+            else updateDinoVisibility();
+        });
+        chart.on('rendered', () => updateDinoVisibility());
+    }
+
+    // attach listeners
+    document.querySelectorAll('.asset-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.asset-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            switchAsset(btn.dataset.asset);
+        });
+    });
+    document.querySelectorAll('.provider-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.provider-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            switchProvider(btn.dataset.provider);
+        });
+    });
+
+    window.onload = async () => {
+        initChart();
+        updateTimeframeButtons();
+        await fetchAndRender();
+    };
+</script>
+</body>
+</html>
