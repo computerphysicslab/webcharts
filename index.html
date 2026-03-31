@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crypto Charts – Multi‑Provider (Binance/Bybit/CoinGecko/CoinPaprika)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Crypto Charts – 500‑Candle Limit + Clear Cache</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -14,34 +14,65 @@
             overflow: hidden;
             height: 100vh;
         }
-        #chart-container { position: relative; width: 100%; height: 100%; }
-        #chart { width: 100%; height: 100%; }
+        #chart-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        #chart {
+            width: 100%;
+            height: 100%;
+        }
+        /* Collapsible top bar */
         #top-bar {
             position: absolute;
             top: 12px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 12px;
+            left: 12px;
+            right: 12px;
             z-index: 20;
+            background: rgba(10, 10, 10, 0.92);
+            border: 1px solid #2a2a2a;
+            border-radius: 12px;
+            padding: 8px 12px;
+            backdrop-filter: blur(8px);
+            transition: transform 0.2s ease, opacity 0.2s;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 70vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        #top-bar.collapsed {
+            transform: translateY(-100%);
+            opacity: 0;
+            pointer-events: none;
+        }
+        #menu-toggle {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            z-index: 25;
             background: rgba(10, 10, 10, 0.85);
             border: 1px solid #2a2a2a;
             border-radius: 8px;
-            padding: 5px 12px;
-            backdrop-filter: blur(6px);
-            flex-wrap: wrap;
-            justify-content: center;
+            padding: 6px 10px;
+            font-size: 20px;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            color: #ccc;
+            transition: 0.2s;
+            line-height: 1;
         }
-        #asset-bar, #timeframe-bar, #provider-bar {
+        #menu-toggle:hover {
+            background: #1e1e1e;
+            color: white;
+        }
+        #asset-bar, #provider-bar, #timeframe-bar, #cache-control {
             display: flex;
-            gap: 6px;
             flex-wrap: wrap;
+            gap: 6px;
             justify-content: center;
-        }
-        #timeframe-bar, #provider-bar {
-            border-left: 1px solid #2a2a2a;
-            padding-left: 10px;
-            margin-left: 5px;
         }
         .asset-btn, .tf-btn, .provider-btn {
             background: transparent;
@@ -50,8 +81,8 @@
             font-size: 11px;
             font-family: inherit;
             font-weight: 600;
-            padding: 3px 8px;
-            border-radius: 5px;
+            padding: 5px 10px;
+            border-radius: 6px;
             cursor: pointer;
             transition: all 0.15s;
         }
@@ -64,6 +95,23 @@
             background: #1e1e1e;
             border-color: #3a3a3a;
         }
+        #clear-cache-btn {
+            background: rgba(200, 60, 60, 0.3);
+            border: 1px solid #a44;
+            color: #ffaaaa;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 5px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        #clear-cache-btn:hover {
+            background: rgba(200, 60, 60, 0.6);
+            color: white;
+            border-color: #f66;
+        }
+        /* Dino */
         #dino {
             position: absolute;
             bottom: 20px;
@@ -117,41 +165,145 @@
             transition: opacity 0.2s;
         }
         #loading.hidden { opacity: 0; pointer-events: none; }
+
+        @media (max-width: 768px) {
+            #top-bar {
+                left: 8px;
+                right: 8px;
+                top: 8px;
+                padding: 8px;
+            }
+            .asset-btn, .tf-btn, .provider-btn, #clear-cache-btn {
+                font-size: 10px;
+                padding: 4px 8px;
+            }
+            #header {
+                font-size: 9px;
+                top: 10px;
+                right: 10px;
+            }
+            #menu-toggle {
+                top: 8px;
+                left: 8px;
+                padding: 4px 8px;
+                font-size: 18px;
+            }
+        }
     </style>
 </head>
 <body>
 <div id="chart-container">
     <div id="loading">Loading…</div>
-    <div id="top-bar">
-        <div id="asset-bar">
-            <button class="asset-btn active" data-asset="BTC">BTC</button>
-            <button class="asset-btn" data-asset="ETH">ETH</button>
-            <button class="asset-btn" data-asset="BNB">BNB</button>
-            <button class="asset-btn" data-asset="SOL">SOL</button>
-            <button class="asset-btn" data-asset="XRP">XRP</button>
-            <button class="asset-btn" data-asset="DOGE">DOGE</button>
-            <button class="asset-btn" data-asset="DOT">DOT</button>
-            <button class="asset-btn" data-asset="KSM">KSM</button>
-            <button class="asset-btn" data-asset="SUI">SUI</button>
-            <button class="asset-btn" data-asset="TRUMP">TRUMP</button>
-            <button class="asset-btn" data-asset="ATOM">ATOM</button>
-        </div>
-        <div id="provider-bar">
-            <button class="provider-btn active" data-provider="binance">Binance</button>
-            <button class="provider-btn" data-provider="bybit">Bybit</button>
-            <button class="provider-btn" data-provider="coingecko">CoinGecko</button>
-            <button class="provider-btn" data-provider="coinpaprika">CoinPaprika</button>
-        </div>
+    <div id="menu-toggle">☰</div>
+    <div id="top-bar" class="collapsed">
+        <div id="asset-bar"></div>
+        <div id="provider-bar"></div>
         <div id="timeframe-bar"></div>
+        <div id="cache-control">
+            <button id="clear-cache-btn">🗑️ Clear Cache</button>
+        </div>
     </div>
     <div id="chart"></div>
     <div id="dino">🦕</div>
     <div id="hover-legend"></div>
-    <div id="header">1d · Log Price · EMA200 + SuperVolume Dots</div>
+    <div id="header">1M · Log Price · EMA200 + Vol*Price/(H-0.99L) Dots</div>
 </div>
 
 <script>
-    // ---------- ASSET MAPPINGS ----------
+    // Maximum number of candles to keep in memory
+    const MAX_CANDLES = 500;
+
+    // ---------- IndexedDB CACHE ----------
+    const DB_NAME = 'CryptoCache';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'candles';
+    let db = null;
+
+    function openDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => {
+                db = request.result;
+                resolve(db);
+            };
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                }
+            };
+        });
+    }
+
+    function getCacheKey(provider, asset, timeframe) {
+        return `${provider}:${asset}:${timeframe}`;
+    }
+
+    async function getCachedData(provider, asset, timeframe) {
+        if (!db) await openDB();
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const result = await new Promise((resolve) => {
+            const req = store.get(getCacheKey(provider, asset, timeframe));
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => resolve(null);
+        });
+        return result ? result.data : null;
+    }
+
+    async function setCachedData(provider, asset, timeframe, data, keepLastUnclosed = true) {
+        if (!db) await openDB();
+        let cachedData = data;
+        if (keepLastUnclosed && data.length > 0) {
+            cachedData = data.slice(0, -1);
+        }
+        // enforce max candles in cache
+        if (cachedData.length > MAX_CANDLES) {
+            cachedData = cachedData.slice(-MAX_CANDLES);
+        }
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        store.put({ id: getCacheKey(provider, asset, timeframe), data: cachedData, lastUpdated: Date.now() });
+        await new Promise((resolve, reject) => {
+            tx.oncomplete = resolve;
+            tx.onerror = reject;
+        });
+    }
+
+    async function updateCache(provider, asset, timeframe, newCandles, isOlder = false) {
+        let existing = await getCachedData(provider, asset, timeframe);
+        if (!existing) existing = [];
+        let merged;
+        if (isOlder) {
+            merged = [...newCandles, ...existing];
+        } else {
+            const existingSet = new Set(existing.map(c => c.time));
+            const toAdd = newCandles.filter(c => !existingSet.has(c.time));
+            merged = [...existing, ...toAdd];
+        }
+        merged.sort((a,b) => a.time - b.time);
+        // enforce max candles: keep the most recent MAX_CANDLES
+        if (merged.length > MAX_CANDLES) {
+            merged = merged.slice(-MAX_CANDLES);
+        }
+        await setCachedData(provider, asset, timeframe, merged, true);
+        return merged;
+    }
+
+    // Clear entire cache store
+    async function clearCache() {
+        if (!db) await openDB();
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.clear();
+        await new Promise((resolve, reject) => {
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    // ---------- ASSET & PROVIDER CONFIG ----------
     const ASSETS = {
         BTC:   { label: 'BTC/USD', binance: 'BTCUSDT', bybit: 'BTCUSDT', gecko: 'bitcoin', paprika: 'btc-bitcoin' },
         ETH:   { label: 'ETH/USD', binance: 'ETHUSDT', bybit: 'ETHUSDT', gecko: 'ethereum', paprika: 'eth-ethereum' },
@@ -166,59 +318,57 @@
         ATOM:  { label: 'ATOM/USD',binance: 'ATOMUSDT',bybit: 'ATOMUSDT', gecko: 'cosmos', paprika: 'atom-cosmos' },
     };
 
-    // Provider configurations
     const PROVIDERS = {
         binance: {
             name: 'Binance',
             supportedTimeframes: ['1M','1w','3d','1d','12h','6h','2h','1h','15m','3m','1m'],
             mapSymbol: (asset) => ASSETS[asset].binance,
             fetch: fetchBinance,
-            supportsInfinite: true
+            supportsInfinite: true,
+            intervalMap: (tf) => tf,
+            getLimit: (tf) => tf === '1M' ? Math.min(200, MAX_CANDLES) : Math.min(500, MAX_CANDLES)
         },
         bybit: {
             name: 'Bybit',
             supportedTimeframes: ['1M','1w','3d','1d','12h','6h','2h','1h','15m','3m','1m'],
             mapSymbol: (asset) => ASSETS[asset].bybit,
             fetch: fetchBybit,
-            supportsInfinite: true
+            supportsInfinite: true,
+            intervalMap: (tf) => tf === '1M' ? 'M' : tf === '1w' ? 'W' : tf === '3d' ? '3D' : tf === '1d' ? 'D' : tf === '12h' ? '12h' : tf === '6h' ? '6h' : tf === '2h' ? '2h' : tf === '1h' ? '1h' : tf === '15m' ? '15' : tf === '3m' ? '3' : '1',
+            getLimit: (tf) => tf === '1M' ? Math.min(200, MAX_CANDLES) : Math.min(500, MAX_CANDLES)
         },
         coingecko: {
             name: 'CoinGecko',
             supportedTimeframes: ['1d','1w','1M'],
             mapSymbol: (asset) => ASSETS[asset].gecko,
             fetch: fetchCoinGecko,
-            supportsInfinite: false   // no pagination, initial load only
+            supportsInfinite: false,
+            intervalMap: (tf) => tf === '1d' ? 1 : tf === '1w' ? 7 : 30,
+            getLimit: () => MAX_CANDLES
         },
         coinpaprika: {
             name: 'CoinPaprika',
             supportedTimeframes: ['1M','1w','1d','1h','5m'],
             mapSymbol: (asset) => ASSETS[asset].paprika,
             fetch: fetchCoinPaprika,
-            supportsInfinite: true
+            supportsInfinite: true,
+            intervalMap: (tf) => {
+                if (tf === '1M') return { interval: '1d', limit: 30 };
+                if (tf === '1w') return { interval: '1d', limit: 7 };
+                if (tf === '1d') return { interval: '1d', limit: 30 };
+                if (tf === '1h') return { interval: '1h', limit: 500 };
+                return { interval: '5m', limit: 500 };
+            },
+            getLimit: (tf) => {
+                if (tf === '1M') return 30;
+                if (tf === '1w') return 7;
+                if (tf === '1d') return 30;
+                return Math.min(500, MAX_CANDLES);
+            }
         }
     };
 
-    // Timeframe -> interval mapping
-    const timeframeToInterval = {
-        binance: {
-            '1M':'1M','1w':'1w','3d':'3d','1d':'1d','12h':'12h','6h':'6h','2h':'2h','1h':'1h','15m':'15m','3m':'3m','1m':'1m'
-        },
-        bybit: {
-            '1M':'M','1w':'W','3d':'3D','1d':'D','12h':'12h','6h':'6h','2h':'2h','1h':'1h','15m':'15','3m':'3','1m':'1'
-        },
-        coingecko: {
-            '1d':1, '1w':7, '1M':30
-        },
-        coinpaprika: {
-            '1M': { interval: '1d', limit: 30 },
-            '1w': { interval: '1d', limit: 7 },
-            '1d': { interval: '1d', limit: 30 },
-            '1h': { interval: '1h', limit: 500 },
-            '5m': { interval: '5m', limit: 500 }
-        }
-    };
-
-    // ---------- DATA FETCHERS ----------
+    // ---------- DATA FETCHERS (with dynamic limit) ----------
     async function fetchBinance(symbol, interval, limit = 500, endTimeMs = null) {
         let url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
         if (endTimeMs) url += `&endTime=${endTimeMs}`;
@@ -254,19 +404,17 @@
     }
 
     async function fetchCoinGecko(symbol, days, limit = 500, endTimeMs = null) {
-        // CoinGecko doesn't support endTime pagination; just fetch the required days
         const url = `https://api.coingecko.com/api/v3/coins/${symbol}/ohlc?vs_currency=usd&days=${days}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error(`CoinGecko HTTP ${res.status}`);
         const data = await res.json();
-        // data is array of [time, open, high, low, close] in ms
         return data.map(d => ({
             time:   Math.floor(d[0] / 1000),
             open:   d[1],
             high:   d[2],
             low:    d[3],
             close:  d[4],
-            volume: 0   // CoinGecko OHLC doesn't provide volume
+            volume: 0
         }));
     }
 
@@ -274,7 +422,6 @@
         const interval = tfConfig.interval;
         let start = null, end = null;
         if (endTimeMs) {
-            // calculate start timestamp for older data
             const msPerCandle = { '5m': 5*60*1000, '1h': 60*60*1000, '1d': 24*60*60*1000 }[interval];
             if (msPerCandle) {
                 end = endTimeMs;
@@ -301,17 +448,23 @@
     let chart = null;
     let currentAsset = 'BTC';
     let currentProvider = 'binance';
-    let currentTimeframe = '1d';
+    let currentTimeframe = '1M';
     let allData = [];
     let isLoading = false;
     let hasMore = true;
     let oldestTimeMs = null;
+    let realtimeInterval = null;
 
     const loadingDiv = document.getElementById('loading');
     const hoverDiv = document.getElementById('hover-legend');
     const headerDiv = document.getElementById('header');
     const dinoDiv = document.getElementById('dino');
+    const assetBar = document.getElementById('asset-bar');
+    const providerBar = document.getElementById('provider-bar');
     const timeframeBar = document.getElementById('timeframe-bar');
+    const topBar = document.getElementById('top-bar');
+    const menuToggle = document.getElementById('menu-toggle');
+    const clearCacheBtn = document.getElementById('clear-cache-btn');
 
     // ---------- HELPERS ----------
     function formatVolume(v) {
@@ -358,7 +511,6 @@
 
     function renderChart() {
         if (!chart || !allData.length) return;
-
         const candleData = allData.map(d => [d.time * 1000, d.open, d.close, d.low, d.high]);
         const emaPoints = computeEMA(allData, 200);
         const emaLine = emaPoints.map(p => [p.time * 1000, p.value]);
@@ -391,12 +543,12 @@
                         L <span style="color:#ef5350">${d.low.toFixed(2)}</span> &nbsp; C <span style="color:${dirColor}">${d.close.toFixed(2)}</span><br>
                         EMA200 <span style="color:#ba68c8">${emaVal}</span><br>
                         Vol: ${formatVolume(d.volume)}<br>
-                        <span style="color:#66ccff">SuperVolume: ${fmtInd}</span>
+                        <span style="color:#66ccff">Vol*Price/(H-0.99L): ${fmtInd}</span>
                     `;
                 }
             },
             legend: {
-                data: ['Candlestick', 'EMA 200', 'Indicator ● (SuperVolume)'],
+                data: ['Candlestick', 'EMA 200', 'Indicator ● (Vol*Price/(H-0.99L))'],
                 textStyle: { color: '#9a9a9a', fontSize: 10 },
                 backgroundColor: 'transparent',
                 right: 20,
@@ -420,7 +572,7 @@
                 { name: 'Candlestick', type: 'candlestick', data: candleData, xAxisIndex: 0, yAxisIndex: 0,
                   itemStyle: { color: '#26a69a', borderColor: '#26a69a', borderColor0: '#ef5350', color0: '#ef5350', borderWidth: 1 } },
                 { name: 'EMA 200', type: 'line', data: emaLine, xAxisIndex: 0, yAxisIndex: 0, lineStyle: { color: '#ba68c8', width: 2 }, smooth: false, symbol: 'none' },
-                { name: 'Indicator ● (SuperVolume)', type: 'scatter', data: indicatorDots, xAxisIndex: 1, yAxisIndex: 1,
+                { name: 'Indicator ● (Vol*Price/(H-0.99L))', type: 'scatter', data: indicatorDots, xAxisIndex: 1, yAxisIndex: 1,
                   symbol: 'circle', symbolSize: 2, itemStyle: { color: '#66ccff', opacity: 0.7 }, tooltip: { show: false }, emphasis: { scale: false } }
             ],
             dataZoom: [
@@ -432,59 +584,102 @@
         updateDinoVisibility();
     }
 
-    // Dinosaur visibility: show if no more data and visible left edge includes the oldest data
     function updateDinoVisibility() {
         if (!chart || !allData.length) return;
         const xAxis = chart.getModel().getComponent('xAxis', 0);
         const extent = xAxis.axis.scale.getExtent();
         const minTime = extent[0];
         const oldest = allData[0].time * 1000;
-        const visibleAtEdge = minTime <= oldest + 5000; // close to the oldest
+        const visibleAtEdge = minTime <= oldest + 5000;
         const showDino = !hasMore && visibleAtEdge;
         dinoDiv.style.opacity = showDino ? '0.7' : '0';
     }
 
-    // ---------- DATA LOADING ----------
-    async function fetchData(provider, asset, timeframe, endTimeMs = null) {
+    // ---------- DATA LOADING WITH CACHE & MAX LIMIT ----------
+    async function fetchNewCandles(provider, asset, timeframe, sinceTimeMs = null) {
         const cfg = PROVIDERS[provider];
         const symbol = cfg.mapSymbol(asset);
+        const intervalCfg = cfg.intervalMap(timeframe);
         if (!symbol) throw new Error(`Symbol not available for ${provider}`);
-        const intervalCfg = timeframeToInterval[provider][timeframe];
-        if (!intervalCfg) throw new Error(`Timeframe ${timeframe} not supported by ${provider}`);
-
+        const limit = cfg.getLimit ? cfg.getLimit(timeframe) : Math.min(500, MAX_CANDLES);
+        let data;
         if (provider === 'coingecko') {
-            return await cfg.fetch(symbol, intervalCfg, 500, endTimeMs);
+            data = await cfg.fetch(symbol, intervalCfg, limit, sinceTimeMs);
         } else if (provider === 'coinpaprika') {
-            return await cfg.fetch(symbol, intervalCfg, 500, endTimeMs);
+            data = await cfg.fetch(symbol, intervalCfg, limit, sinceTimeMs);
         } else {
-            // binance, bybit: interval is string
-            return await cfg.fetch(symbol, intervalCfg, 500, endTimeMs);
+            data = await cfg.fetch(symbol, intervalCfg, limit, sinceTimeMs);
+        }
+        return data;
+    }
+
+    async function loadInitialData() {
+        const cached = await getCachedData(currentProvider, currentAsset, currentTimeframe);
+        if (cached && cached.length > 0) {
+            allData = cached;
+            oldestTimeMs = allData[0].time * 1000;
+            hasMore = true;
+            renderChart();
+            // fetch newer candles (if last candle is older than now)
+            const lastCachedTime = allData[allData.length-1].time * 1000;
+            const now = Date.now();
+            if (lastCachedTime < now - 3600000) {
+                const newer = await fetchNewCandles(currentProvider, currentAsset, currentTimeframe, now);
+                if (newer.length && newer[newer.length-1].time * 1000 > lastCachedTime) {
+                    let merged = [...allData, ...newer];
+                    merged.sort((a,b) => a.time - b.time);
+                    if (merged.length > MAX_CANDLES) merged = merged.slice(-MAX_CANDLES);
+                    allData = merged;
+                    oldestTimeMs = allData[0].time * 1000;
+                    await updateCache(currentProvider, currentAsset, currentTimeframe, newer, false);
+                    renderChart();
+                }
+            }
+        } else {
+            const data = await fetchNewCandles(currentProvider, currentAsset, currentTimeframe);
+            allData = data;
+            if (allData.length > MAX_CANDLES) allData = allData.slice(-MAX_CANDLES);
+            oldestTimeMs = allData[0].time * 1000;
+            await setCachedData(currentProvider, currentAsset, currentTimeframe, allData, true);
+            renderChart();
+        }
+        // After initial load, set hasMore based on whether we reached the max candles limit
+        if (allData.length >= MAX_CANDLES) {
+            hasMore = false;
+        } else {
+            hasMore = false; // for providers that don't support infinite, we don't load more
         }
     }
 
     async function loadMoreData() {
-        if (isLoading || !hasMore || !oldestTimeMs) return;
-        const providerCfg = PROVIDERS[currentProvider];
-        if (!providerCfg.supportsInfinite) {
+        if (isLoading || !hasMore || !oldestTimeMs || allData.length >= MAX_CANDLES) return;
+        const cfg = PROVIDERS[currentProvider];
+        if (!cfg.supportsInfinite) {
             hasMore = false;
+            updateDinoVisibility();
             return;
         }
         isLoading = true;
         try {
-            const older = await fetchData(currentProvider, currentAsset, currentTimeframe, oldestTimeMs - 1);
+            const older = await fetchNewCandles(currentProvider, currentAsset, currentTimeframe, oldestTimeMs - 1);
             if (!older.length || older.length < 2) { hasMore = false; return; }
             if (older[0].time >= allData[0].time) { hasMore = false; return; }
-
+            let merged = [...older, ...allData];
+            merged.sort((a,b) => a.time - b.time);
+            if (merged.length > MAX_CANDLES) {
+                hasMore = false;
+                isLoading = false;
+                return;
+            }
+            allData = merged;
+            oldestTimeMs = allData[0].time * 1000;
+            await updateCache(currentProvider, currentAsset, currentTimeframe, older, true);
+            // preserve view
             const visibleRange = chart.getModel().getComponent('xAxis', 0).axis.scale.getExtent();
             const oldMin = visibleRange[0];
             const oldMax = visibleRange[1];
             const oldSpan = oldMax - oldMin;
-
-            allData = [...older, ...allData];
-            oldestTimeMs = older[0].time * 1000;
             renderChart();
-
-            // restore view
             const dataMin = allData[0].time * 1000;
             const dataMax = allData[allData.length-1].time * 1000;
             const finalMin = Math.max(oldMin, dataMin);
@@ -494,6 +689,7 @@
             if (isFinite(startPct) && isFinite(endPct)) {
                 chart.dispatchAction({ type: 'dataZoom', start: startPct, end: endPct });
             }
+            if (allData.length >= MAX_CANDLES) hasMore = false;
         } catch(e) {
             console.error(e);
             hasMore = false;
@@ -503,9 +699,46 @@
         }
     }
 
+    // Realtime update: refresh last candle every 3 seconds (only for intraday timeframes)
+    async function refreshLastCandle() {
+        if (currentTimeframe === '1M' || currentTimeframe === '1w' || currentTimeframe === '3d') return;
+        if (!currentProvider || !currentAsset || !currentTimeframe) return;
+        try {
+            const latest = await fetchNewCandles(currentProvider, currentAsset, currentTimeframe);
+            if (!latest.length) return;
+            const lastCandle = latest[latest.length-1];
+            const lastExisting = allData[allData.length-1];
+            if (lastCandle.time > lastExisting.time) {
+                allData.push(lastCandle);
+                if (allData.length > MAX_CANDLES) allData = allData.slice(-MAX_CANDLES);
+                await updateCache(currentProvider, currentAsset, currentTimeframe, [lastCandle], false);
+                renderChart();
+            } else if (lastCandle.time === lastExisting.time) {
+                Object.assign(lastExisting, lastCandle);
+                await updateCache(currentProvider, currentAsset, currentTimeframe, allData.slice(0, -1), true);
+                renderChart();
+            }
+        } catch(e) {
+            console.warn('Realtime update failed', e);
+        }
+    }
+
+    function startRealtimeUpdates() {
+        if (realtimeInterval) clearInterval(realtimeInterval);
+        if (currentTimeframe === '1M' || currentTimeframe === '1w' || currentTimeframe === '3d') return;
+        realtimeInterval = setInterval(() => refreshLastCandle(), 3000);
+    }
+    function stopRealtimeUpdates() {
+        if (realtimeInterval) {
+            clearInterval(realtimeInterval);
+            realtimeInterval = null;
+        }
+    }
+
     function shouldLoadMore() {
         if (!hasMore || isLoading) return false;
         if (!PROVIDERS[currentProvider].supportsInfinite) return false;
+        if (allData.length >= MAX_CANDLES) return false;
         const xAxis = chart.getModel().getComponent('xAxis', 0);
         const extent = xAxis.axis.scale.getExtent();
         const minTime = extent[0];
@@ -522,6 +755,7 @@
     }
 
     async function fetchAndRender() {
+        stopRealtimeUpdates();
         allData = [];
         hasMore = true;
         oldestTimeMs = null;
@@ -529,12 +763,10 @@
         hoverDiv.style.display = 'none';
         dinoDiv.style.opacity = '0';
         try {
-            allData = await fetchData(currentProvider, currentAsset, currentTimeframe);
-            if (!allData.length) throw new Error('No data');
-            oldestTimeMs = allData[0].time * 1000;
-            renderChart();
+            await loadInitialData();
+            startRealtimeUpdates();
             const provName = PROVIDERS[currentProvider].name;
-            headerDiv.innerHTML = `${ASSETS[currentAsset].label} · ${currentTimeframe} · ${provName} · Log Price · Drag to pan (auto‑load)`;
+            headerDiv.innerHTML = `${ASSETS[currentAsset].label} · ${currentTimeframe} · ${provName} · Log Price · Max ${MAX_CANDLES} candles`;
         } catch(err) {
             console.error(err);
             loadingDiv.innerHTML = `Error: ${err.message}`;
@@ -545,11 +777,43 @@
         updateDinoVisibility();
     }
 
-    // ---------- UI UPDATE ----------
+    // ---------- UI BUILDING ----------
+    function buildAssetButtons() {
+        assetBar.innerHTML = '';
+        for (const [key, val] of Object.entries(ASSETS)) {
+            const btn = document.createElement('button');
+            btn.className = `asset-btn ${key === currentAsset ? 'active' : ''}`;
+            btn.textContent = key;
+            btn.dataset.asset = key;
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.asset-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                switchAsset(key);
+            });
+            assetBar.appendChild(btn);
+        }
+    }
+
+    function buildProviderButtons() {
+        providerBar.innerHTML = '';
+        for (const [key, val] of Object.entries(PROVIDERS)) {
+            const btn = document.createElement('button');
+            btn.className = `provider-btn ${key === currentProvider ? 'active' : ''}`;
+            btn.textContent = val.name;
+            btn.dataset.provider = key;
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.provider-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                switchProvider(key);
+            });
+            providerBar.appendChild(btn);
+        }
+    }
+
     function updateTimeframeButtons() {
         const supported = PROVIDERS[currentProvider].supportedTimeframes;
         if (!supported.includes(currentTimeframe)) {
-            currentTimeframe = supported[0] || '1d';
+            currentTimeframe = supported[0] || '1M';
         }
         timeframeBar.innerHTML = '';
         for (const tf of supported) {
@@ -581,6 +845,28 @@
         fetchAndRender();
     }
 
+    // Clear cache handler
+    async function handleClearCache() {
+        if (!db) await openDB();
+        loadingDiv.classList.remove('hidden');
+        loadingDiv.innerHTML = 'Clearing cache...';
+        try {
+            await clearCache();
+            loadingDiv.innerHTML = 'Cache cleared. Reloading...';
+            await fetchAndRender();
+        } catch (err) {
+            console.error(err);
+            loadingDiv.innerHTML = `Failed to clear cache: ${err.message}`;
+            setTimeout(() => loadingDiv.classList.add('hidden'), 2000);
+        } finally {
+            setTimeout(() => {
+                if (loadingDiv.innerHTML !== 'Clearing cache...') {
+                    loadingDiv.classList.add('hidden');
+                }
+            }, 1000);
+        }
+    }
+
     function initChart() {
         const dom = document.getElementById('chart');
         chart = echarts.init(dom);
@@ -592,24 +878,23 @@
         chart.on('rendered', () => updateDinoVisibility());
     }
 
-    // attach listeners
-    document.querySelectorAll('.asset-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.asset-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            switchAsset(btn.dataset.asset);
-        });
+    // Collapsible menu
+    menuToggle.addEventListener('click', () => {
+        topBar.classList.toggle('collapsed');
     });
-    document.querySelectorAll('.provider-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.provider-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            switchProvider(btn.dataset.provider);
-        });
-    });
+    if (window.innerWidth <= 768) {
+        topBar.classList.add('collapsed');
+    }
 
+    // Clear cache button
+    clearCacheBtn.addEventListener('click', handleClearCache);
+
+    // start everything
     window.onload = async () => {
+        await openDB();
         initChart();
+        buildAssetButtons();
+        buildProviderButtons();
         updateTimeframeButtons();
         await fetchAndRender();
     };
