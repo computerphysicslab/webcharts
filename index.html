@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Crypto Charts – 500‑Candle Limit + Clear Cache</title>
+    <title>Crypto Charts OnLine</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -211,7 +211,7 @@
 
 <script>
     // Maximum number of candles to keep in memory
-    const MAX_CANDLES = 500;
+    const MAX_CANDLES = 2500;
 
     // ---------- IndexedDB CACHE ----------
     const DB_NAME = 'CryptoCache';
@@ -305,23 +305,24 @@
 
     // ---------- ASSET & PROVIDER CONFIG ----------
     const ASSETS = {
-        BTC:   { label: 'BTC/USD', binance: 'BTCUSDT', bybit: 'BTCUSDT', gecko: 'bitcoin', paprika: 'btc-bitcoin' },
-        ETH:   { label: 'ETH/USD', binance: 'ETHUSDT', bybit: 'ETHUSDT', gecko: 'ethereum', paprika: 'eth-ethereum' },
-        BNB:   { label: 'BNB/USD', binance: 'BNBUSDT', bybit: 'BNBUSDT', gecko: 'binancecoin', paprika: 'bnb-binance-coin' },
-        SOL:   { label: 'SOL/USD', binance: 'SOLUSDT', bybit: 'SOLUSDT', gecko: 'solana', paprika: 'sol-solana' },
-        XRP:   { label: 'XRP/USD', binance: 'XRPUSDT', bybit: 'XRPUSDT', gecko: 'ripple', paprika: 'xrp-xrp' },
-        DOGE:  { label: 'DOGE/USD',binance: 'DOGEUSDT',bybit: 'DOGEUSDT', gecko: 'dogecoin', paprika: 'doge-dogecoin' },
-        DOT:   { label: 'DOT/USD', binance: 'DOTUSDT', bybit: 'DOTUSDT', gecko: 'polkadot', paprika: 'dot-polkadot' },
-        KSM:   { label: 'KSM/USD', binance: 'KSMUSDT', bybit: 'KSMUSDT', gecko: 'kusama', paprika: 'ksm-kusama' },
-        SUI:   { label: 'SUI/USD', binance: 'SUIUSDT', bybit: 'SUIUSDT', gecko: 'sui', paprika: 'sui-sui' },
-        TRUMP: { label: 'TRUMP/USD',binance: 'TRUMPUSDT',bybit: 'TRUMPUSDT', gecko: 'trump', paprika: 'trump-trump' },
-        ATOM:  { label: 'ATOM/USD',binance: 'ATOMUSDT',bybit: 'ATOMUSDT', gecko: 'cosmos', paprika: 'atom-cosmos' },
+        BTC:   { label: 'BTC/USD', binance: 'BTCUSDT', bybit: 'BTCUSDT' },
+        ETH:   { label: 'ETH/USD', binance: 'ETHUSDT', bybit: 'ETHUSDT' },
+        BNB:   { label: 'BNB/USD', binance: 'BNBUSDT', bybit: 'BNBUSDT' },
+        SOL:   { label: 'SOL/USD', binance: 'SOLUSDT', bybit: 'SOLUSDT' },
+        XRP:   { label: 'XRP/USD', binance: 'XRPUSDT', bybit: 'XRPUSDT' },
+        DOGE:  { label: 'DOGE/USD', binance: 'DOGEUSDT', bybit: 'DOGEUSDT' },
+        DOT:   { label: 'DOT/USD', binance: 'DOTUSDT', bybit: 'DOTUSDT' },
+        KSM:   { label: 'KSM/USD', binance: 'KSMUSDT', bybit: 'KSMUSDT' },
+        SUI:   { label: 'SUI/USD', binance: 'SUIUSDT', bybit: 'SUIUSDT' },
+        TRUMP: { label: 'TRUMP/USD', binance: 'TRUMPUSDT', bybit: 'TRUMPUSDT' },
+        ATOM:  { label: 'ATOM/USD', binance: 'ATOMUSDT', bybit: 'ATOMUSDT' },
+        ETC:   { label: 'ETC/USD', binance: 'ETCUSDT', bybit: 'ETCUSDT' }
     };
 
     const PROVIDERS = {
         binance: {
             name: 'Binance',
-            supportedTimeframes: ['1M','1w','3d','1d','12h','6h','2h','1h','15m','3m','1m'],
+            supportedTimeframes: ['1M','1w','3d','1d','12h','4h','1h','15m','3m','1m'],
             mapSymbol: (asset) => ASSETS[asset].binance,
             fetch: fetchBinance,
             supportsInfinite: true,
@@ -330,41 +331,19 @@
         },
         bybit: {
             name: 'Bybit',
-            supportedTimeframes: ['1M','1w','3d','1d','12h','6h','2h','1h','15m','3m','1m'],
+            supportedTimeframes: ['1M','1w','3d','1d','12h','4h','1h','15m','3m','1m'],
             mapSymbol: (asset) => ASSETS[asset].bybit,
             fetch: fetchBybit,
             supportsInfinite: true,
-            intervalMap: (tf) => tf === '1M' ? 'M' : tf === '1w' ? 'W' : tf === '3d' ? '3D' : tf === '1d' ? 'D' : tf === '12h' ? '12h' : tf === '6h' ? '6h' : tf === '2h' ? '2h' : tf === '1h' ? '1h' : tf === '15m' ? '15' : tf === '3m' ? '3' : '1',
-            getLimit: (tf) => tf === '1M' ? Math.min(200, MAX_CANDLES) : Math.min(500, MAX_CANDLES)
-        },
-        coingecko: {
-            name: 'CoinGecko',
-            supportedTimeframes: ['1d','1w','1M'],
-            mapSymbol: (asset) => ASSETS[asset].gecko,
-            fetch: fetchCoinGecko,
-            supportsInfinite: false,
-            intervalMap: (tf) => tf === '1d' ? 1 : tf === '1w' ? 7 : 30,
-            getLimit: () => MAX_CANDLES
-        },
-        coinpaprika: {
-            name: 'CoinPaprika',
-            supportedTimeframes: ['1M','1w','1d','1h','5m'],
-            mapSymbol: (asset) => ASSETS[asset].paprika,
-            fetch: fetchCoinPaprika,
-            supportsInfinite: true,
             intervalMap: (tf) => {
-                if (tf === '1M') return { interval: '1d', limit: 30 };
-                if (tf === '1w') return { interval: '1d', limit: 7 };
-                if (tf === '1d') return { interval: '1d', limit: 30 };
-                if (tf === '1h') return { interval: '1h', limit: 500 };
-                return { interval: '5m', limit: 500 };
+                const map = {
+                    '1M': 'M', '1w': 'W', '3d': '3D', '1d': 'D',
+                    '12h': '12h', '4h': '4h', '1h': '1h',
+                    '15m': '15', '3m': '3', '1m': '1'
+                };
+                return map[tf];
             },
-            getLimit: (tf) => {
-                if (tf === '1M') return 30;
-                if (tf === '1w') return 7;
-                if (tf === '1d') return 30;
-                return Math.min(500, MAX_CANDLES);
-            }
+            getLimit: (tf) => tf === '1M' ? Math.min(200, MAX_CANDLES) : Math.min(500, MAX_CANDLES)
         }
     };
 
@@ -401,47 +380,6 @@
             close:  parseFloat(c[4]),
             volume: parseFloat(c[5])
         })).reverse();
-    }
-
-    async function fetchCoinGecko(symbol, days, limit = 500, endTimeMs = null) {
-        const url = `https://api.coingecko.com/api/v3/coins/${symbol}/ohlc?vs_currency=usd&days=${days}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`CoinGecko HTTP ${res.status}`);
-        const data = await res.json();
-        return data.map(d => ({
-            time:   Math.floor(d[0] / 1000),
-            open:   d[1],
-            high:   d[2],
-            low:    d[3],
-            close:  d[4],
-            volume: 0
-        }));
-    }
-
-    async function fetchCoinPaprika(symbol, tfConfig, limit = 500, endTimeMs = null) {
-        const interval = tfConfig.interval;
-        let start = null, end = null;
-        if (endTimeMs) {
-            const msPerCandle = { '5m': 5*60*1000, '1h': 60*60*1000, '1d': 24*60*60*1000 }[interval];
-            if (msPerCandle) {
-                end = endTimeMs;
-                start = end - limit * msPerCandle;
-            }
-        }
-        let url = `https://api.coinpaprika.com/v1/coins/${symbol}/ohlcv?quote=usd&limit=${limit}&interval=${interval}`;
-        if (start) url += `&start=${Math.floor(start/1000)}`;
-        if (end) url += `&end=${Math.floor(end/1000)}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`CoinPaprika HTTP ${res.status}`);
-        const data = await res.json();
-        return data.map(d => ({
-            time:   Math.floor(new Date(d.time_open).getTime() / 1000),
-            open:   d.open,
-            high:   d.high,
-            low:    d.low,
-            close:  d.close,
-            volume: d.volume
-        })).sort((a,b) => a.time - b.time);
     }
 
     // ---------- GLOBAL STATE ----------
@@ -511,6 +449,7 @@
 
     function renderChart() {
         if (!chart || !allData.length) return;
+
         const candleData = allData.map(d => [d.time * 1000, d.open, d.close, d.low, d.high]);
         const emaPoints = computeEMA(allData, 200);
         const emaLine = emaPoints.map(p => [p.time * 1000, p.value]);
@@ -518,6 +457,26 @@
 
         const option = {
             backgroundColor: '#0d0d0d',
+
+            // ==================== NEW: WATERMARK GRAPHIC ====================
+            graphic: [{
+                type: 'image',
+                id: 'aibull-watermark',
+                left: 'center',
+                top: 'center',
+                // right: 30,           // distance from right edge
+                // bottom: 50,          // distance from bottom (above the dataZoom slider)
+                z: -10,              // behind everything
+                style: {
+                    image: 'https://aibull.io/wp-content/uploads/2024/10/LOGO_AIBULL-300x110.png',
+                    width: 240,                          // adjust size as needed
+                    height: 80,                          // adjust size as needed
+                    opacity: 0.15                        // subtle watermark (0.08 - 0.18 works well)
+                },
+                silent: true   // non-interactive
+            }],
+            // ==============================================================
+
             tooltip: {
                 trigger: 'axis',
                 axisPointer: { type: 'cross' },
@@ -602,15 +561,7 @@
         const intervalCfg = cfg.intervalMap(timeframe);
         if (!symbol) throw new Error(`Symbol not available for ${provider}`);
         const limit = cfg.getLimit ? cfg.getLimit(timeframe) : Math.min(500, MAX_CANDLES);
-        let data;
-        if (provider === 'coingecko') {
-            data = await cfg.fetch(symbol, intervalCfg, limit, sinceTimeMs);
-        } else if (provider === 'coinpaprika') {
-            data = await cfg.fetch(symbol, intervalCfg, limit, sinceTimeMs);
-        } else {
-            data = await cfg.fetch(symbol, intervalCfg, limit, sinceTimeMs);
-        }
-        return data;
+        return await cfg.fetch(symbol, intervalCfg, limit, sinceTimeMs);
     }
 
     async function loadInitialData() {
@@ -750,7 +701,7 @@
     }
 
     function getCandleSeconds(tf) {
-        const map = { '1M':30*86400, '1w':7*86400, '3d':3*86400, '1d':86400, '12h':43200, '6h':21600, '4h':14400, '2h':7200, '1h':3600, '15m':900, '5m':300, '3m':180, '1m':60 };
+        const map = { '1M':30*86400, '1w':7*86400, '3d':3*86400, '1d':86400, '12h':43200, '4h':14400, '1h':3600, '15m':900, '5m':300, '3m':180, '1m':60 };
         return map[tf] || 86400;
     }
 
